@@ -33,9 +33,9 @@ AudioConnection          patchCord10(mixer1, notefreq1);
 
 
 //Set up LEDs
-#define NUM_LEDS 12
-#define DATA_PIN 24
-#define BRIGHTNESS 30
+#define NUM_LEDS 127
+#define DATA_PIN 20
+#define BRIGHTNESS 100
 //#define CLOCK_PIN 13
 CRGB leds[NUM_LEDS];
 uint8_t FFT[NUM_LEDS];
@@ -46,26 +46,28 @@ float floatFFT[NUM_LEDS];
 
 float logbase(uint16_t x, float base);
 uint16_t logscale(uint16_t x, uint16_t xMax, uint16_t logMax, float base);
-void updateFFT();
+void updateFFTLog();
+void updateFFTLinear();
 void floatToIntFFTDumb(uint16_t scalar);
 void updateLEDs();
 
 void setup()
 {
   // initialize LED digital pin as an output.
-  FastLED.addLeds<WS2812SERIAL,DATA_PIN,GRB>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
+  FastLED.addLeds<WS2812SERIAL,DATA_PIN,BRG>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   //FastLED.addLeds<LED_TYPE,DATA_PIN,CLK_PIN,COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setBrightness(BRIGHTNESS);
   fill_rainbow(leds, NUM_LEDS, 0, 5);
   FastLED.show();
   AudioMemory(20);
+  fft256_R.averageTogether(20);
 }
 
 void loop()
 {
 
-  EVERY_N_MILLISECONDS(10){updateFFT();floatToIntFFTDumb(400);}
-  EVERY_N_MILLISECONDS(100){updateLEDs();}
+  EVERY_N_MILLISECONDS(10){updateFFTLinear();floatToIntFFTDumb(400);}
+  EVERY_N_MILLISECONDS(10){updateLEDs();}
 }
 
 //Returns the log_base(x) 
@@ -89,10 +91,21 @@ uint16_t logscale(uint16_t x, uint16_t xMax, uint16_t logMax, float base){
 
 //Reads the current Fast Fourier Transform Values
 //Replaces them in the FFT Array
-void updateFFT(){
+void updateFFTLog(){
   uint16_t startBin = 0; 
   for (int i = 0; i < NUM_LEDS; i++){
     uint16_t endBin = logscale(i, NUM_LEDS, 127, 20);
+    floatFFT[i] = fft256_R.read(startBin, endBin);
+    startBin = endBin;
+  }
+}
+
+void updateFFTLinear(){
+  uint16_t startBin = 0; 
+  uint16_t maxBin = 127;
+  uint16_t binWidth = maxBin/NUM_LEDS;
+  for (int i = 0; i < NUM_LEDS; i++){
+    uint16_t endBin =  startBin + binWidth;
     floatFFT[i] = fft256_R.read(startBin, endBin);
     startBin = endBin;
   }
@@ -103,23 +116,15 @@ void updateFFT(){
 void floatToIntFFTDumb(uint16_t scalar){
   for (int i = 0; i < NUM_LEDS; i++){
     uint8_t val = min(255, floatFFT[i]*scalar);
-    Serial.print(" ");
-    Serial.print(val);
-    Serial.print("-");
     FFT[i] = val;
   }
-  Serial.println();
 }
 
 //updates the LED colors
 void updateLEDs(){
   for (int i = 0; i < NUM_LEDS; i++){
     uint8_t brightness = FFT[i];
-    leds[i] = CRGB(brightness, 0, 0);
-    // Serial.print(" ");
-    // Serial.print(brightness);
-    // Serial.print("-");
+    leds[i] = CRGB(0, brightness, 0);
   }
   FastLED.show();
-  // Serial.println();
 }
