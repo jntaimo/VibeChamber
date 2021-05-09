@@ -33,9 +33,9 @@ AudioConnection          patchCord10(mixer1, notefreq1);
 
 
 //Set up LEDs
-#define NUM_LEDS 127
+#define NUM_LEDS 24
 #define DATA_PIN 20
-#define BRIGHTNESS 100
+#define BRIGHTNESS 70
 //#define CLOCK_PIN 13
 CRGB leds[NUM_LEDS];
 uint8_t FFT[NUM_LEDS];
@@ -60,14 +60,14 @@ void setup()
   fill_rainbow(leds, NUM_LEDS, 0, 5);
   FastLED.show();
   AudioMemory(20);
-  fft256_R.averageTogether(20);
+  fft256_R.averageTogether(7);
 }
 
 void loop()
 {
 
-  EVERY_N_MILLISECONDS(10){updateFFTLinear();floatToIntFFTDumb(400);}
-  EVERY_N_MILLISECONDS(10){updateLEDs();}
+  EVERY_N_MILLISECONDS(5){updateFFTLinear();floatToIntFFTDumb(500);}
+  EVERY_N_MILLISECONDS(5){updateLEDs();}
 }
 
 //Returns the log_base(x) 
@@ -90,7 +90,7 @@ uint16_t logscale(uint16_t x, uint16_t xMax, uint16_t logMax, float base){
 }
 
 //Reads the current Fast Fourier Transform Values
-//Replaces them in the FFT Array
+//Replaces them in the FFT Array using a logarithmic scale
 void updateFFTLog(){
   uint16_t startBin = 0; 
   for (int i = 0; i < NUM_LEDS; i++){
@@ -100,7 +100,21 @@ void updateFFTLog(){
   }
 }
 
+//Reads the current Fast Fourier Transform Values
+//Replaces them in the FFT Array using a linear scale
 void updateFFTLinear(){
+  uint16_t startBin = 0; 
+  uint16_t maxBin = 127;
+  uint16_t binWidth = maxBin/NUM_LEDS;
+  for (int i = 0; i < NUM_LEDS; i++){
+    uint16_t endBin =  startBin + binWidth;
+    floatFFT[i] = fft256_R.read(startBin, endBin);
+    startBin = endBin;
+  }
+}
+
+//updates the fft using the mel scale conversion
+void updateFFTMelScale(){
   uint16_t startBin = 0; 
   uint16_t maxBin = 127;
   uint16_t binWidth = maxBin/NUM_LEDS;
@@ -124,6 +138,7 @@ void floatToIntFFTDumb(uint16_t scalar){
 void updateLEDs(){
   for (int i = 0; i < NUM_LEDS; i++){
     uint8_t brightness = FFT[i];
+    if (brightness < 5) brightness = 0;
     leds[i] = CRGB(0, brightness, 0);
   }
   FastLED.show();
