@@ -33,9 +33,9 @@ AudioConnection          patchCord10(mixer1, notefreq1);
 
 
 //Set up LEDs
-#define NUM_LEDS 24
+#define NUM_LEDS 143
 #define DATA_PIN 20
-#define BRIGHTNESS 140
+#define BRIGHTNESS 200
 //#define CLOCK_PIN 13
 CRGB leds[NUM_LEDS];
 uint8_t FFT[NUM_LEDS];
@@ -50,6 +50,7 @@ void updateFFTLog();
 void updateFFTLinear();
 void floatToIntFFTDumb(uint16_t scalar);
 void updateLEDs();
+void updateLEDsLog();
 float melScale(uint16_t f);
 float melToFreq(uint16_t m);
 void updateFFTMelScale();
@@ -71,8 +72,8 @@ void setup()
 void loop()
 {
 
-  EVERY_N_MILLISECONDS(2){updateFFTMelScale();floatToIntFFTDumb(700);}
-  EVERY_N_MILLISECONDS(2){updateLEDs();}
+  EVERY_N_MILLISECONDS(2){updateFFTMelScale();floatToIntFFTDumb(200);}
+  EVERY_N_MILLISECONDS(2){updateLEDsLog();}
   //EVERY_N_MILLISECONDS(10){SerialPrintLEDs();}
 }
 
@@ -121,31 +122,22 @@ void updateFFTLinear(){
 
 //updates the fft using the mel scale conversion
 void updateFFTMelScale(){
-  uint16_t maxBin = 80;
+  uint16_t maxBin = 75;
   uint16_t binFrequencyWidth = 172;
   uint16_t maxFreq = maxBin*binFrequencyWidth;
   uint16_t binWidth = maxBin/NUM_LEDS;
   uint16_t maxMel = melScale(maxFreq);
-  uint16_t startMel = melScale(20);
-  // Serial.println("------------------------------");
+  uint16_t startMel = 0;
+  uint16_t melSpacing = maxMel/NUM_LEDS;
+  Serial.println("------------------------------");
   for (int i = 0; i < NUM_LEDS; i++){
-    uint16_t endMel = startMel + i*(double)maxMel/NUM_LEDS;
+    uint16_t endMel = startMel + melSpacing;
     uint16_t startBin = melToFreq(startMel)/binFrequencyWidth;
     uint16_t endBin = melToFreq(endMel)/binFrequencyWidth;
-    // Serial.print("LED_i: ");
-    // Serial.print(i);
-    // Serial.print(" StartMel: ");
-    // Serial.print(startMel);
-    // Serial.print(" EndMel: ");
-    // Serial.print(endMel);
-    // Serial.print(" StartBin: ");
-    // Serial.print(startBin);
-    // Serial.print(" EndBin: ");
-    // Serial.println(endBin);
     floatFFT[i] = fft256_R.read(startBin, endBin);
     startMel = endMel;
   }
-  // Serial.println("******************************");
+
 }
 
 //converts frequency to mel scale
@@ -172,7 +164,16 @@ void floatToIntFFTDumb(uint16_t scalar){
 void updateLEDs(){
   for (int i = 0; i < NUM_LEDS; i++){
     uint8_t brightness = FFT[i];
-    if (brightness < 5) brightness = 0;
+    //if (brightness < 5) brightness = 0;
+    leds[i] = CRGB(0, brightness, 0);
+  }
+  FastLED.show();
+}
+
+void updateLEDsLog(){
+  for (int i = 0; i < NUM_LEDS; i++){
+    uint8_t brightness = logscale(FFT[i], 255, 255, 10);
+    //if (brightness < 5) brightness = 0;
     leds[i] = CRGB(0, brightness, 0);
   }
   FastLED.show();
