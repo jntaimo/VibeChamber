@@ -9,7 +9,7 @@
 
 // GUItool: begin automatically generated code
 AudioInputUSB            usb1;           //xy=98,759
-AudioAnalyzeFFT256       fft256_R;       //xy=298,1015
+AudioAnalyzeFFT1024       fft256_R;       //xy=298,1015
 AudioAnalyzeFFT256       fft256_L;       //xy=303,406
 AudioAnalyzeRMS          rms_L;           //xy=313,460
 AudioAnalyzeRMS          rms_R;           //xy=325,948
@@ -35,7 +35,9 @@ AudioConnection          patchCord10(mixer1, notefreq1);
 //Set up LEDs
 #define NUM_LEDS 143
 #define DATA_PIN 20
-#define BRIGHTNESS 200
+#define BRIGHTNESS 100
+#define NUM_BINS 127
+#define BIN_FREQUENCY_WIDTH 43
 //#define CLOCK_PIN 13
 CRGB leds[NUM_LEDS];
 uint8_t FFT[NUM_LEDS];
@@ -49,6 +51,7 @@ uint16_t logscale(uint16_t x, uint16_t xMax, uint16_t logMax, float base);
 void updateFFTLog();
 void updateFFTLinear();
 void floatToIntFFTDumb(uint16_t scalar);
+void floatToIntFFTLog(float maxFloat);
 void updateLEDs();
 void updateLEDsLog();
 float melScale(uint16_t f);
@@ -62,18 +65,18 @@ void setup()
   FastLED.addLeds<WS2812SERIAL,DATA_PIN,BRG>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   //FastLED.addLeds<LED_TYPE,DATA_PIN,CLK_PIN,COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setBrightness(BRIGHTNESS);
-  fill_rainbow(leds, NUM_LEDS, 0, 5);
+  fill_solid(leds, NUM_LEDS, CRGB::Black);
   FastLED.show();
   AudioMemory(20);
-  fft256_R.averageTogether(5);
+  fft256_R.averageTogether(10);
   Serial.begin(115200);
 }
 
 void loop()
 {
 
-  EVERY_N_MILLISECONDS(2){updateFFTMelScale();floatToIntFFTDumb(200);}
-  EVERY_N_MILLISECONDS(2){updateLEDsLog();}
+  EVERY_N_MILLISECONDS(1){updateFFTMelScale();floatToIntFFTLog(0.15);}
+  EVERY_N_MILLISECONDS(1){updateLEDs();}
   //EVERY_N_MILLISECONDS(10){SerialPrintLEDs();}
 }
 
@@ -101,7 +104,7 @@ uint16_t logscale(uint16_t x, uint16_t xMax, uint16_t logMax, float base){
 void updateFFTLog(){
   uint16_t startBin = 0; 
   for (int i = 0; i < NUM_LEDS; i++){
-    uint16_t endBin = logscale(i, NUM_LEDS, 127, 20);
+    uint16_t endBin = logscale(i, NUM_LEDS, NUM_BINS, 20);
     floatFFT[i] = fft256_R.read(startBin, endBin);
     startBin = endBin;
   }
@@ -111,8 +114,7 @@ void updateFFTLog(){
 //Replaces them in the FFT Array using a linear scale
 void updateFFTLinear(){
   uint16_t startBin = 0; 
-  uint16_t maxBin = 127;
-  uint16_t binWidth = maxBin/NUM_LEDS;
+  uint16_t binWidth = NUM_BINS/NUM_LEDS;
   for (int i = 0; i < NUM_LEDS; i++){
     uint16_t endBin =  startBin + binWidth;
     floatFFT[i] = fft256_R.read(startBin, endBin);
@@ -122,18 +124,16 @@ void updateFFTLinear(){
 
 //updates the fft using the mel scale conversion
 void updateFFTMelScale(){
-  uint16_t maxBin = 75;
-  uint16_t binFrequencyWidth = 172;
-  uint16_t maxFreq = maxBin*binFrequencyWidth;
-  uint16_t binWidth = maxBin/NUM_LEDS;
+  uint16_t maxBin = NUM_BINS*0.8;
+  uint16_t maxFreq = maxBin*BIN_FREQUENCY_WIDTH;
   uint16_t maxMel = melScale(maxFreq);
   uint16_t startMel = 0;
   uint16_t melSpacing = maxMel/NUM_LEDS;
   Serial.println("------------------------------");
   for (int i = 0; i < NUM_LEDS; i++){
     uint16_t endMel = startMel + melSpacing;
-    uint16_t startBin = melToFreq(startMel)/binFrequencyWidth;
-    uint16_t endBin = melToFreq(endMel)/binFrequencyWidth;
+    uint16_t startBin = melToFreq(startMel)/BIN_FREQUENCY_WIDTH;
+    uint16_t endBin = melToFreq(endMel)/BIN_FREQUENCY_WIDTH;
     floatFFT[i] = fft256_R.read(startBin, endBin);
     startMel = endMel;
   }
@@ -159,14 +159,28 @@ void floatToIntFFTDumb(uint16_t scalar){
     FFT[i] = val;
   }
 }
-
+//Converts the float values for the FFT into 8 bit integer values in the FFT array
+//Converts the values to a logarithmic scale to better represent the sounds visually
+void floatToIntFFTLog(float maxFloat){
+  float maxBrightness = 255;
+  for (int i = 0; i < NUM_LEDS; i++){
+    float k = maxBrightness/log(maxFloat + 1); 
+    FFT[i] = k*log(floatFFT[i]+1); 
+  }
+}
 //updates the LED colors
 void updateLEDs(){
   for (int i = 0; i < NUM_LEDS; i++){
     uint8_t brightness = FFT[i];
     //if (brightness < 5) brightness = 0;
-    leds[i] = CRGB(0, brightness, 0);
+    //leds[i] = CRGB(0, brightness, 0);
+    // leds[i] = ColorFromPalette(PartyColors_p, brightness);
+      leds[i] = ColorFromPalette(HeatColors_p, brightness);  
+
+    
+    
   }
+  
   FastLED.show();
 }
 
